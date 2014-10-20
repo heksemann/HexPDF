@@ -26,6 +26,7 @@
 
 package net.heksemann.hexpdf.examples;
 
+import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.awt.Image;
@@ -51,9 +52,13 @@ public class CreateHexPDFdoc {
         BufferedImage overlay = getImage("http://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/560px-PNG_transparency_demonstration_1.png");
         String[][] table = getTable("table.txt");
 
-        // Add a main title, centered
+        // Add a main title, centered in shiny colours
         doc.title1Style();
+        doc.setTextColor(new Color(0x2020ff));
         doc.drawText("A simple pdf document\n\n", HexPDF.CENTER);
+
+        // Typeset everything else in boring black
+        doc.setTextColor(Color.black);
 
         // Add a left aligned sub title
         doc.title2Style();

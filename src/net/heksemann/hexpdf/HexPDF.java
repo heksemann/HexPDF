@@ -24,6 +24,7 @@
 
 package net.heksemann.hexpdf;
 
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.logging.Level;
@@ -224,7 +225,7 @@ public class HexPDF extends PDDocument {
     /**
      * Default margin in points between table cell border and table cell text.
      * @see #setTableCellMargin(float) 
-     * @see #drawTable(java.lang.String[][], float[], int[]) 
+     * @see #drawTable(java.lang.String[][], float[], int[], int) 
      */
     public static final float DEFAULT_TABLE_CELL_MARGIN = 5;
 
@@ -1017,5 +1018,19 @@ public class HexPDF extends PDDocument {
      */
     public PDPageContentStream getPDPageContentStream(){
         return cs;
+    }
+    
+    /**
+     * Set text color.
+     * 
+     * @param color     the new text color
+     */
+    public void setTextColor(Color color){
+        try {
+            cs.setNonStrokingColor(color);
+        } catch (IOException ex) {
+            Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
     }
 }

@@ -19,11 +19,11 @@
  * 
  * HexPDF adds stuff like automatic page adding, word-wrap, newline awareness,
  * left/right/center text alignment, table creation and image insertion.
+ * It also has support for text colour and page footers.
  * 
  * This file, CreateHexPDFdoc.java is an example showing basic HexPDF usage.
  *
  */
-
 package net.heksemann.hexpdf.examples;
 
 import java.awt.Color;
@@ -35,22 +35,25 @@ import java.net.URL;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
+import net.heksemann.hexpdf.Footer;
 import net.heksemann.hexpdf.HexPDF;
 
 /**
  * Create a simple, two-page, A4 document with text, images and a table.
  * Demonstrates usage of HexPDF
- * 
+ *
  * @author Frank J. Øynes, heksemann@gmail.com
  */
 public class CreateHexPDFdoc {
 
     private void createDocument() {
-        HexPDF doc = new HexPDF();
-
         BufferedImage basemap = getImage("http://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Dollnstein_-_Burgzugang.jpg/800px-Dollnstein_-_Burgzugang.jpg");
         BufferedImage overlay = getImage("http://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/560px-PNG_transparency_demonstration_1.png");
         String[][] table = getTable("table.txt");
+
+        // Create a new document and include a default footer
+        HexPDF doc = new HexPDF();
+        doc.setFooter(Footer.defaultFooter);
 
         // Add a main title, centered in shiny colours
         doc.title1Style();
@@ -60,52 +63,46 @@ public class CreateHexPDFdoc {
         // Typeset everything else in boring black
         doc.setTextColor(Color.black);
 
-        // Add a left aligned sub title
+        // Add a left aligned sub title followed by left aligned paragraphs
         doc.title2Style();
         doc.drawText("\n\nLeft aligned text\n\n");
-        
-        // Add some text, default left aligned
         doc.normalStyle();
-        doc.drawText(getText(4));
+        doc.drawText(getText(3));
 
-        // Add a centered image with another image as overlay
+        // Add a centered image with another image as overlay, caption below
         doc.drawImage(basemap, HexPDF.CENTER);
         doc.drawImage(overlay, HexPDF.CENTER | HexPDF.NEWLINE);
-
-        // Add a figure caption centered under the image
         doc.drawText("Figure 1: An example figure with overlay\n", HexPDF.CENTER);
 
-        // A second left aligned sub title
-        doc.title2Style();
-        doc.drawText("\n\nJustified text\n\n");
-
-        // Add some more text - justified this time
-        doc.normalStyle();
-        doc.drawText(getText(3), HexPDF.JUSTIFY);
-
-        // A third left aligned sub title
+        // A new left aligned sub title, now followed by right aligned text
         doc.title2Style();
         doc.drawText("\n\nRight aligned text\n\n");
-
-        // Add some more text - justified this time
         doc.normalStyle();
         doc.drawText(getText(2), HexPDF.RIGHT);
 
-        // Add a table centered on page. Four columns, aligned left, center, right, left
+        // Add a table centered on page, crossing page boundary. 
+        // Four columns, aligned left, center, right, left
         doc.drawTable(table,
                 new float[]{100, 60, 70, 200},
-                new int[]{HexPDF.LEFT, HexPDF.CENTER, HexPDF.RIGHT, HexPDF.LEFT}, 
+                new int[]{HexPDF.LEFT, HexPDF.CENTER, HexPDF.RIGHT, HexPDF.LEFT},
                 HexPDF.CENTER);
         // Add a caption under the table
         doc.drawText("Table 1: A rather odd table, centered on page\n", HexPDF.CENTER);
 
-        // The final sub title, still left aligned
+        // New left aligned sub title, followed by centered paragraphs
         doc.title2Style();
         doc.drawText("\n\nCentered text\n\n");
-
-        // Add last block of text - centered
         doc.normalStyle();
-        doc.drawText(getText(5), HexPDF.CENTER);
+        doc.drawText(getText(4), HexPDF.CENTER);
+
+        // Add some newlines followed by pages of text, justified
+        // A final left aligned sub title followed by lods of justified text 
+        doc.title2Style();
+        doc.drawText("\n\nJustified text\n\n");
+        doc.normalStyle();
+        for (int i = 0; i < 10; i++) {
+            doc.drawText(getText(5), HexPDF.JUSTIFY);
+        }
 
         // The end...
         doc.title1Style();
@@ -119,6 +116,7 @@ public class CreateHexPDFdoc {
         //
     }
 
+    // Helper functions used to retrieve text, table and images
     private BufferedImage getImage(String fn) {
         BufferedImage image = null;
         final int w = 400;
@@ -140,13 +138,13 @@ public class CreateHexPDFdoc {
 
     private String getText(int num) {
         String[] txt = {"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Multa sunt dicta ab antiquis de contemnendis ac despiciendis rebus humanis; Duo Reges: constructio interrete. Id Sextilius factum negabat. Tum Quintus: Est plane, Piso, ut dicis, inquit.\n\n",
-                        "Quasi vero, inquit, perpetua oratio rhetorum solum, non etiam philosophorum sit. Septem autem illi non suo, sed populorum suffragio omnium nominati sunt. Cur post Tarentum ad Archytam? Quia nec honesto quic quam honestius nec turpi turpius. Re mihi non aeque satisfacit, et quidem locis pluribus. Unum nescio, quo modo possit, si luxuriosus sit, finitas cupiditates habere. Ad quorum et cognitionem et usum iam corroborati natura ipsa praeeunte deducimur.\n\n",
-                        "Qualem igitur hominem natura inchoavit? Tum ille timide vel potius verecunde: Facio, inquit. Cur iustitia laudatur? Haec bene dicuntur, nec ego repugno, sed inter sese ipsa pugnant. Erit enim mecum, si tecum erit. Ab hoc autem quaedam non melius quam veteres, quaedam omnino relicta.\n\n",
-                        "Vestri haec verecundius, illi fortasse constantius. Si quicquam extra virtutem habeatur in bonis. Utinam quidem dicerent alium alio beatiorem! Iam ruinas videres. At certe gravius. Aliter enim nosmet ipsos nosse non possumus. Suo enim quisque studio maxime ducitur.\n\n",
-                        "Ut non sine causa ex iis memoriae ducta sit disciplina. Sint ista Graecorum; Sed nonne merninisti licere mihi ista probare, quae sunt a te dicta? Dicimus aliquem hilare vivere; Quamquam tu hanc copiosiorem etiam soles dicere. Sed vos squalidius, illorum vides quam niteat oratio. Si mala non sunt, iacet omnis ratio Peripateticorum. Hoc non est positum in nostra actione. Quae cum magnifice primo dici viderentur, considerata minus probabantur. Honesta oratio, Socratica, Platonis etiam.\n\n"};
+            "Quasi vero, inquit, perpetua oratio rhetorum solum, non etiam philosophorum sit. Septem autem illi non suo, sed populorum suffragio omnium nominati sunt. Cur post Tarentum ad Archytam? Quia nec honesto quic quam honestius nec turpi turpius. Re mihi non aeque satisfacit, et quidem locis pluribus. Unum nescio, quo modo possit, si luxuriosus sit, finitas cupiditates habere. Ad quorum et cognitionem et usum iam corroborati natura ipsa praeeunte deducimur.\n\n",
+            "Qualem igitur hominem natura inchoavit? Tum ille timide vel potius verecunde: Facio, inquit. Cur iustitia laudatur? Haec bene dicuntur, nec ego repugno, sed inter sese ipsa pugnant. Erit enim mecum, si tecum erit. Ab hoc autem quaedam non melius quam veteres, quaedam omnino relicta.\n\n",
+            "Vestri haec verecundius, illi fortasse constantius. Si quicquam extra virtutem habeatur in bonis. Utinam quidem dicerent alium alio beatiorem! Iam ruinas videres. At certe gravius. Aliter enim nosmet ipsos nosse non possumus. Suo enim quisque studio maxime ducitur.\n\n",
+            "Ut non sine causa ex iis memoriae ducta sit disciplina. Sint ista Graecorum; Sed nonne merninisti licere mihi ista probare, quae sunt a te dicta? Dicimus aliquem hilare vivere; Quamquam tu hanc copiosiorem etiam soles dicere. Sed vos squalidius, illorum vides quam niteat oratio. Si mala non sunt, iacet omnis ratio Peripateticorum. Hoc non est positum in nostra actione. Quae cum magnifice primo dici viderentur, considerata minus probabantur. Honesta oratio, Socratica, Platonis etiam.\n\n"};
 
         String ret = "";
-        for (int i = 0; i < num && i < txt.length; i++){
+        for (int i = 0; i < num && i < txt.length; i++) {
             ret += txt[i];
         }
         return ret;
@@ -167,8 +165,8 @@ public class CreateHexPDFdoc {
 
         return tab;
     }
- 
-    public static void main(String[] args){
+
+    public static void main(String[] args) {
         CreateHexPDFdoc hex = new CreateHexPDFdoc();
         hex.createDocument();
     }

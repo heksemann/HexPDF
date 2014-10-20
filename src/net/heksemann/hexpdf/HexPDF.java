@@ -19,6 +19,7 @@
  * 
  * HexPDF adds stuff like automatic page adding, word-wrap, newline awareness,
  * left/right/center text alignment, table creation and image insertion.
+ * It also has support for text colour and page footers.
  * 
  */
 package net.heksemann.hexpdf;
@@ -26,6 +27,9 @@ package net.heksemann.hexpdf;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.pdfbox.exceptions.COSVisitorException;
@@ -104,7 +108,9 @@ public class HexPDF extends PDDocument {
 
     private PDPageContentStream cs;
     private PDPage currentPage = null;
-
+    private int numPages;
+    private Footer footer = null;
+    private Color textColor;
     // Page setup
     private final PDRectangle pageSize;
     private PDFont font;
@@ -254,6 +260,7 @@ public class HexPDF extends PDDocument {
      */
     public HexPDF() {
         super();
+        this.numPages = 0;
         this.rightMargin = 50f;
         this.leftMargin = 50f;
         this.bottomMargin = 50f;
@@ -261,6 +268,7 @@ public class HexPDF extends PDDocument {
         this.fontSize = 10;
         this.font = PDType1Font.HELVETICA;
         this.pageSize = PDPage.PAGE_SIZE_A4;
+        this.textColor = Color.black;
         firstPage();
     }
 
@@ -345,6 +353,61 @@ public class HexPDF extends PDDocument {
         }
     }
 
+    private String replaceBookmarks(String str, int pagenum, int numpages) {
+        String ret = str;
+
+        String today = new SimpleDateFormat("dd MMM yyyy").format(Calendar.getInstance().getTime());
+        String user = System.getProperty("user.name");
+
+        ret = ret.replace(Footer.PAGENUM, "" + pagenum);
+        ret = ret.replace(Footer.NUMPAGES, "" + numpages);
+        ret = ret.replace(Footer.DATE, today);
+        ret = ret.replace(Footer.USER, user);
+        return ret;
+    }
+
+    private void drawFooters() {
+        if (footer != null) {
+
+            int pg;
+            int pagecounter = 0;
+            int total = (footer.isCOUNT_FIRSTPAGE()) ? numPages : numPages - 1;
+
+            List<PDPage> pages = this.getDocumentCatalog().getAllPages();
+            for (PDPage page : pages) {
+                pagecounter++;
+                try {
+                    cs = new PDPageContentStream(this, page, true, true);
+                    setTextColor(footer.getTextColor());
+                    setFont(footer.getFont());
+                    setFontSize(footer.getFontsize());
+                    if (pagecounter > 1 || false == footer.isOMIT_FIRSTPAGE()) {
+                        pg = (footer.isCOUNT_FIRSTPAGE()) ? pagecounter : pagecounter - 1;
+
+                        if (footer.getLeftText() != null && !footer.getLeftText().isEmpty()) {
+                            String left = replaceBookmarks(footer.getLeftText(), pg, total);
+                            setCursor(leftMargin, 25);
+                            drawText(left, HexPDF.LEFT);
+                        }
+                        if (footer.getRightText() != null && !footer.getRightText().isEmpty()) {
+                            String right = replaceBookmarks(footer.getRightText(), pg, total);
+                            setCursor(leftMargin, 25);
+                            drawText(right, HexPDF.RIGHT);
+                        }
+                        if (footer.getCenterText() != null && !footer.getCenterText().isEmpty()) {
+                            String right = replaceBookmarks(footer.getCenterText(), pg, total);
+                            setCursor(leftMargin, 25);
+                            drawText(right, HexPDF.CENTER);
+                        }
+                    }
+                    cs.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+    }
+
     /**
      * Close the current page (if any), and open a new one. Cursor position is
      * reset to top-left corner of writable area (within margins)
@@ -352,6 +415,8 @@ public class HexPDF extends PDDocument {
      * @see #closePage()
      */
     protected void newPage() {
+
+        numPages++;
         if (currentPage != null) {
             closePage();
         }
@@ -377,6 +442,8 @@ public class HexPDF extends PDDocument {
      */
     public void finish(String filename) {
         try {
+            closePage();
+            drawFooters();
             save(filename);
             close();
         } catch (IOException ex) {
@@ -387,7 +454,6 @@ public class HexPDF extends PDDocument {
     }
 
     // To avoid direct use of overridable method in constructor
-
     private void firstPage() {
         newPage();
     }
@@ -587,8 +653,9 @@ public class HexPDF extends PDDocument {
                         cursorX += (align == HexPDF.RIGHT) ? space : space / 2;
                     }
                 }
-                if(toDraw != null)
+                if (toDraw != null) {
                     doDrawText(toDraw);
+                }
 
                 i += num;
                 height += lineSep;
@@ -1069,9 +1136,18 @@ public class HexPDF extends PDDocument {
     public void setTextColor(Color color) {
         try {
             cs.setNonStrokingColor(color);
+            textColor = color;
         } catch (IOException ex) {
             Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
         }
-
     }
+
+    public Footer getFooter() {
+        return footer;
+    }
+
+    public void setFooter(Footer footer) {
+        this.footer = footer;
+    }
+
 }

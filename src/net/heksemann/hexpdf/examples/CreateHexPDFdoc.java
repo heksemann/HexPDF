@@ -77,11 +77,19 @@ public class CreateHexPDFdoc {
 
         // A second left aligned sub title
         doc.title2Style();
+        doc.drawText("\n\nJustified text\n\n");
+
+        // Add some more text - justified this time
+        doc.normalStyle();
+        doc.drawText(getText(3), HexPDF.JUSTIFY);
+
+        // A third left aligned sub title
+        doc.title2Style();
         doc.drawText("\n\nRight aligned text\n\n");
 
-        // Add some more text - right aligned this time
+        // Add some more text - justified this time
         doc.normalStyle();
-        doc.drawText(getText(3), HexPDF.RIGHT);
+        doc.drawText(getText(2), HexPDF.RIGHT);
 
         // Add a table centered on page. Four columns, aligned left, center, right, left
         doc.drawTable(table,
@@ -89,7 +97,7 @@ public class CreateHexPDFdoc {
                 new int[]{HexPDF.LEFT, HexPDF.CENTER, HexPDF.RIGHT, HexPDF.LEFT}, 
                 HexPDF.CENTER);
         // Add a caption under the table
-        doc.drawText("Table 1: A reather odd table, centered on page\n", HexPDF.CENTER);
+        doc.drawText("Table 1: A rather odd table, centered on page\n", HexPDF.CENTER);
 
         // The final sub title, still left aligned
         doc.title2Style();

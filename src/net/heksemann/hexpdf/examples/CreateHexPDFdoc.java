@@ -54,11 +54,15 @@ public class CreateHexPDFdoc {
         // Create a new document and include a default footer
         HexPDF doc = new HexPDF();
         doc.setFooter(Footer.defaultFooter);
+        // Change center text in footer
+        doc.getFooter().setCenterText("A simple PDF document\nWritten by me");
+        // Use footer also on first page
+        doc.getFooter().setOMIT_FIRSTPAGE(false);
 
         // Add a main title, centered in shiny colours
         doc.title1Style();
         doc.setTextColor(new Color(0x2020ff));
-        doc.drawText("A simple pdf document\n\n", HexPDF.CENTER);
+        doc.drawText("My simple pdf document\n\n", HexPDF.CENTER);
 
         // Typeset everything else in boring black
         doc.setTextColor(Color.black);

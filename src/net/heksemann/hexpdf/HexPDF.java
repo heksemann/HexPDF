@@ -120,6 +120,8 @@ public class HexPDF extends PDDocument {
     private float leftMargin;
     private float rightMargin;
 
+    private boolean ignorePagebleed;
+    
     // Calculated dimensions
     private float pageWidth;
     private float pageHeight;
@@ -260,6 +262,7 @@ public class HexPDF extends PDDocument {
      */
     public HexPDF() {
         super();
+        this.ignorePagebleed = false;
         this.numPages = 0;
         this.rightMargin = 50f;
         this.leftMargin = 50f;
@@ -368,11 +371,11 @@ public class HexPDF extends PDDocument {
 
     private void drawFooters() {
         if (footer != null) {
+            ignorePagebleed = true;
 
             int pg;
             int pagecounter = 0;
             int total = (footer.isCOUNT_FIRSTPAGE()) ? numPages : numPages - 1;
-
             List<PDPage> pages = this.getDocumentCatalog().getAllPages();
             for (PDPage page : pages) {
                 pagecounter++;
@@ -405,6 +408,7 @@ public class HexPDF extends PDDocument {
                     Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
+            ignorePagebleed = false;
         }
     }
 
@@ -605,7 +609,7 @@ public class HexPDF extends PDDocument {
                 cursorX = startx;
                 cursorY -= lineSep;
                 // New page?
-                if ((cursorY - lineSep) < bottomMargin) {
+                if (ignorePagebleed == false && ((cursorY - lineSep) < bottomMargin)) {
                     newPage();
                     cursorX = startx;
                 }
@@ -615,7 +619,7 @@ public class HexPDF extends PDDocument {
                     cursorX = startx;
                     cursorY -= lineSep;
                     // New page?
-                    if ((cursorY - lineSep) < bottomMargin) {
+                    if (ignorePagebleed == false && ((cursorY - lineSep) < bottomMargin)) {
                         newPage();
                         cursorX = startx;
                     }
@@ -626,7 +630,7 @@ public class HexPDF extends PDDocument {
                     cursorX = startx;
                     i++;
                     // New page?
-                    if ((cursorY - lineSep) < bottomMargin) {
+                    if (ignorePagebleed == false && ((cursorY - lineSep) < bottomMargin)) {
                         newPage();
                         cursorX = startx;
                     }

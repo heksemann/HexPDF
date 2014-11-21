@@ -111,6 +111,8 @@ public class HexPDF extends PDDocument {
     private int numPages;
     private Footer footer = null;
     private Color textColor;
+    private Color normalColor;
+    private Color titleColor;
     // Page setup
     private final PDRectangle pageSize;
     private PDFont font;
@@ -218,9 +220,9 @@ public class HexPDF extends PDDocument {
     private static final String TXT_NEWLINE = "@@NeWlInE@@";
 
     // Styling
-    private static float normalFontSize = 10;
-    private static float title1FontSize = 20;
-    private static float title2FontSize = 15;
+    private float normalFontSize = 10;
+    private float title1FontSize = 20;
+    private float title2FontSize = 15;
 
     /**
      * Default font size used for normalStyle.
@@ -247,12 +249,12 @@ public class HexPDF extends PDDocument {
     public static final float DEFAULT_TITLE2_FONT_SIZE = 15;
 
     // Table
-    private static float TableCellMargin = 5;
+    private float tableCellMargin = 5;
 
     /**
      * Default margin in points between table cell border and table cell text.
      *
-     * @see #setTableCellMargin(float)
+     * @see #settableCellMargin(float)
      * @see #drawTable(java.lang.String[][], float[], int[], int)
      */
     public static final float DEFAULT_TABLE_CELL_MARGIN = 5;
@@ -272,6 +274,8 @@ public class HexPDF extends PDDocument {
         this.font = PDType1Font.HELVETICA;
         this.pageSize = PDPage.PAGE_SIZE_A4;
         this.textColor = Color.black;
+        this.normalColor = Color.black;
+        this.titleColor = Color.BLUE;
         firstPage();
     }
 
@@ -418,7 +422,7 @@ public class HexPDF extends PDDocument {
      *
      * @see #closePage()
      */
-    protected void newPage() {
+    public void newPage() {
 
         numPages++;
         if (currentPage != null) {
@@ -428,8 +432,8 @@ public class HexPDF extends PDDocument {
         currentPage = new PDPage();
         currentPage.setMediaBox(pageSize);
         setDimensions();
-        cursorX = leftMargin;
-        cursorY = bottomMargin + contentHeight;
+        cursorX = contentStartX;
+        cursorY = contentStartY;
         try {
             cs = new PDPageContentStream(this, currentPage);
             cs.setFont(font, fontSize);
@@ -597,7 +601,9 @@ public class HexPDF extends PDDocument {
         } else if ((flags & HexPDF.JUSTIFY) > 0) {
             align = HexPDF.JUSTIFY;
         }
-
+        if (txt == null || txt.isEmpty()){
+            return 0;
+        }
         txt = txt.replace("\n", " " + HexPDF.TXT_NEWLINE + " ");
         String[] words = txt.split("\\s+");
         int i = 0;
@@ -697,6 +703,7 @@ public class HexPDF extends PDDocument {
      * <code>rightMargin</code>
      *
      * @param txt The text to be drawn
+     * @return height of text drawn
      * @see #drawText(java.lang.String, int)
      * @see #_drawText(java.lang.String, float, float, int)
      */
@@ -752,6 +759,10 @@ public class HexPDF extends PDDocument {
         } catch (IOException ex) {
             Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
         }
+        // newpage if image cannot fit on rest of current page
+        if ((cursorY - imH) < contentEndY){
+            newPage();
+        }
         float imgX = cursorX;
         float imgY = cursorY - imH;
         if ((flags & HexPDF.CENTER) > 0) {
@@ -797,8 +808,8 @@ public class HexPDF extends PDDocument {
 
     // TABLE functions
     private float addCell(float x, float y, float w, String txt, int flags) {
-        setCursor(x + HexPDF.TableCellMargin, y - 0.8f * lineSep);
-        return _drawText(txt, x + HexPDF.TableCellMargin, x + w - HexPDF.TableCellMargin, flags);
+        setCursor(x + tableCellMargin, y - 0.8f * lineSep);
+        return _drawText(txt, x + tableCellMargin, x + w - tableCellMargin, flags);
     }
 
     private void addCellBorder(float x, float y, float w, float h) {
@@ -843,6 +854,7 @@ public class HexPDF extends PDDocument {
      * @param column_width array of column widths
      * @param column_flag array of flags for text alignment within columns, one
      * of <code>HexPDF.LEFT | HexPDF.CENTER | HexPDF.RIGHT</code>
+     * @param table_align flag for alignment of the table itself
      * @return the height of the table - if multipage then return the height on
      * the last page.
      */
@@ -875,7 +887,7 @@ public class HexPDF extends PDDocument {
             }
         }
         cursorX = leftMargin;
-        cursorY -= rowheight;
+        cursorY -= (rowheight + tableCellMargin);
         return tabheight;
     }
 
@@ -884,27 +896,33 @@ public class HexPDF extends PDDocument {
      * Set current font to a title-1 style.
      *
      * @see #title1FontSize
+     * @see #titleColor
      */
     public void title1Style() {
-        setFontSize(HexPDF.title1FontSize);
+        setFontSize(title1FontSize);
+        setTextColor(titleColor);
     }
 
     /**
      * Set current font to a title-2 style.
      *
      * @see #title2FontSize
+     * @see #titleColor
      */
     public void title2Style() {
-        setFontSize(HexPDF.title2FontSize);
+        setFontSize(title2FontSize);
+        setTextColor(titleColor);
     }
 
     /**
      * Set current font to normal style.
      *
      * @see #normalFontSize
+     * @see #normalColor
      */
     public void normalStyle() {
-        setFontSize(HexPDF.normalFontSize);
+        setFontSize(normalFontSize);
+        setTextColor(normalColor);
     }
 
     /**
@@ -928,6 +946,7 @@ public class HexPDF extends PDDocument {
         } catch (IOException ex) {
             Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
         }
+        lineSep = font.getFontDescriptor().getFontBoundingBox().getHeight() / 1000 * fontSize;
     }
 
     /**
@@ -955,6 +974,7 @@ public class HexPDF extends PDDocument {
         } catch (IOException ex) {
             Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
         }
+        lineSep = font.getFontDescriptor().getFontBoundingBox().getHeight() / 1000 * fontSize;
     }
 
     /**
@@ -1076,48 +1096,48 @@ public class HexPDF extends PDDocument {
     /**
      * Set the font size to be used for normal style.
      *
-     * @param normalFontSize font size in points.
+     * @param fontSize font size in points.
      *
      * @see #normalStyle()
      * @see #DEFAULT_NORMAL_FONT_SIZE
      */
-    public static void setNormalFontSize(float normalFontSize) {
-        HexPDF.normalFontSize = normalFontSize;
+    public void setNormalFontSize(float fontSize) {
+        normalFontSize = fontSize;
     }
 
     /**
      * Set the font size to be used for title 1 style.
      *
-     * @param title1FontSize font size in points.
+     * @param fontSize font size in points.
      *
      * @see #title1Style()
      * @see #DEFAULT_TITLE1_FONT_SIZE
      */
-    public static void setTitle1FontSize(float title1FontSize) {
-        HexPDF.title1FontSize = title1FontSize;
+    public void setTitle1FontSize(float fontSize) {
+        title1FontSize = fontSize;
     }
 
     /**
      * Set the font size to be used for title 2 style.
      *
-     * @param title2FontSize font size in points.
+     * @param fontSize font size in points.
      *
      * @see #title2Style()
      * @see #DEFAULT_TITLE2_FONT_SIZE
      */
-    public static void setTitle2FontSize(float title2FontSize) {
-        HexPDF.title2FontSize = title2FontSize;
+    public void setTitle2FontSize(float fontSize) {
+        title2FontSize = fontSize;
     }
 
     /**
      * Set the margin to be used between table borders and table text
      *
-     * @param TableCellMargin table margin in points
+     * @param cellMargin table margin in points
      *
      * @see #DEFAULT_TABLE_CELL_MARGIN
      */
-    public static void setTableCellMargin(float TableCellMargin) {
-        HexPDF.TableCellMargin = TableCellMargin;
+    public void settableCellMargin(float cellMargin) {
+        tableCellMargin = cellMargin;
     }
 
     /**
@@ -1134,13 +1154,15 @@ public class HexPDF extends PDDocument {
 
     /**
      * Set text color.
-     *
+     * This will be reset if you change style.
+     * @see #setTitleColor(java.awt.Color) 
+     * @see #setNormalColor(java.awt.Color) 
      * @param color the new text color
      */
     public void setTextColor(Color color) {
         try {
             cs.setNonStrokingColor(color);
-            textColor = color;
+            //textColor = color;
         } catch (IOException ex) {
             Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -1152,6 +1174,38 @@ public class HexPDF extends PDDocument {
 
     public void setFooter(Footer footer) {
         this.footer = footer;
+    }
+
+    public Color getTitleColor() {
+        return titleColor;
+    }
+
+    public void setTitleColor(Color titleColor) {
+        this.titleColor = titleColor;
+    }
+
+    public Color getNormalColor() {
+        return normalColor;
+    }
+
+    public void setNormalColor(Color color) {
+        this.normalColor = color;
+    }
+
+    public float getContentStartX() {
+        return contentStartX;
+    }
+
+    public float getContentStartY() {
+        return contentStartY;
+    }
+
+    public float getContentEndX() {
+        return contentEndX;
+    }
+
+    public float getContentEndY() {
+        return contentEndY;
     }
 
 }

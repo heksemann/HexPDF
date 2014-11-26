@@ -58,7 +58,7 @@ import org.apache.pdfbox.pdmodel.graphics.xobject.PDXObjectImage;
  * <pre>
  * <code>
  *     HexPDF doc = new HexPDF();
- *
+ *  
  *     BufferedImage basemap = (your function for retrieving the image)
  *     BufferedImage overlay = (your function for retrieving the image)
  *     String title = "A simple pdf document";
@@ -75,6 +75,11 @@ import org.apache.pdfbox.pdmodel.graphics.xobject.PDXObjectImage;
  *                          {"USA",      "col2", "col2", "col4"},
  *                          {"Germany",  "col2", "col2", "col4"}
  *                        };
+ * 
+ *     // Create the first page. IMPORTANT!
+ *     doc.newPage();
+ * 
+ *     // Add a title
  *     doc.title1Style();
  *     doc.drawText("My simple document\n", HexPDF.CENTER);
  *

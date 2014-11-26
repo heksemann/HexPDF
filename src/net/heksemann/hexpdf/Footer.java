@@ -6,8 +6,6 @@
 package net.heksemann.hexpdf;
 
 import java.awt.Color;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 
@@ -59,6 +57,13 @@ public class Footer {
      */
     public static Footer defaultFooter = new Footer();
 
+    /**
+     * Sole constructor.
+     * Return a footer in gray TIMES_BOLD, sz 8.
+     * The left part of the text is todays date, 
+     * center is username, 
+     * and the right part is PAGENUM of NUMPAGES
+     */
     public Footer() {
         textColor = Color.gray;
         leftText = Footer.DATE;
@@ -133,7 +138,7 @@ public class Footer {
     /**
      * Set this flag to false to include footer also on first page
      *
-     * @param OMIT_FIRSTPAGE
+     * @param OMIT_FIRSTPAGE    true or false
      */
     public void setOMIT_FIRSTPAGE(boolean OMIT_FIRSTPAGE) {
         this.OMIT_FIRSTPAGE = OMIT_FIRSTPAGE;
@@ -154,7 +159,7 @@ public class Footer {
     /**
      * Set this flag to false to omit the first page from total page count.
      *
-     * @param COUNT_FIRSTPAGE
+     * @param COUNT_FIRSTPAGE   true or false
      * @see #PAGENUM
      * @see #NUMPAGES
      */

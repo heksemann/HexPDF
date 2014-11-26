@@ -19,6 +19,7 @@
  * 
  * HexPDF adds stuff like automatic page adding, word-wrap, newline awareness,
  * left/right/center text alignment, table creation and image insertion.
+ * Tables may contain images and text.
  * It also has support for text colour and page footers.
  * 
  */
@@ -32,6 +33,7 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.fontbox.util.BoundingBox;
 import org.apache.pdfbox.exceptions.COSVisitorException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -62,7 +64,7 @@ import org.apache.pdfbox.pdmodel.graphics.xobject.PDXObjectImage;
  *     String title = "A simple pdf document";
  *     String exampleText = "Lorem ipsum dolor.......";
  *
- *     String[][] table = {
+ *     Object[][] table = {
  *                          {"Country",  "Area", "Population", "Info"},
  *                          {"Norway",   "col2", "col2", "col4"},
  *                          {"Sweden",   "col2", "col2", "col4"},
@@ -77,7 +79,7 @@ import org.apache.pdfbox.pdmodel.graphics.xobject.PDXObjectImage;
  *     doc.drawText("My simple document\n", HexPDF.CENTER);
  *
  *     doc.normalStyle();
- *     doc.drawText(exampleText, HexPDF.LEFT);
+ *     doc.drawText(exampleText); // Default left aligned
  *
  *     doc.drawImage(basemap, HexPDF.CENTER);
  *     doc.drawImage(overlay, HexPDF.CENTER | HexPDF.NEWLINE);
@@ -96,8 +98,7 @@ import org.apache.pdfbox.pdmodel.graphics.xobject.PDXObjectImage;
  *     doc.title1Style();
  *     doc.drawText("-- END OF DOCUMENT --", HexPDF.CENTER);
  *
- *     doc.save("myfile.pdf");
- *     doc.close();
+ *     doc.finish("myfile.pdf");
  * </code>
  * </pre>
  *
@@ -105,28 +106,38 @@ import org.apache.pdfbox.pdmodel.graphics.xobject.PDXObjectImage;
  * @author Frank J. Øynes, heksemann@gmail.com
  */
 public class HexPDF extends PDDocument {
-
+    private int orientation;
     private PDPageContentStream cs;
     private PDPage currentPage = null;
     private int numPages;
     private Footer footer = null;
-    private Color textColor;
     private Color normalColor;
     private Color titleColor;
     // Page setup
-    private final PDRectangle pageSize;
+    private PDRectangle pageSize;
     private PDFont font;
     private float fontSize;
     private float topMargin;
     private float bottomMargin;
     private float leftMargin;
     private float rightMargin;
-
     private boolean ignorePagebleed;
     
     // Calculated dimensions
     private float pageWidth;
     private float pageHeight;
+
+    /**
+     * Page orientation portrait (default).
+     * @see #setOrientation(int) 
+     */
+    public final static int PORTRAIT = 0;
+
+    /**
+     * Page orientation Landscape.
+     * @see #setOrientation(int) 
+     */
+    public final static int LANDSCAPE = 1;
 
     /**
      * The height, in points, of the writable area between bottom and top
@@ -142,7 +153,7 @@ public class HexPDF extends PDDocument {
 
     /**
      * The starting (leftmost, lowest value) x position of writable area. Equal
-     * to <code>leftMargin
+     * to <code>leftMargin</code>
      */
     protected float contentStartX;
 
@@ -215,7 +226,7 @@ public class HexPDF extends PDDocument {
      * Flag for drawImage - if set, move cursor to bottom after placement.
      */
     public static final int NEWLINE = 16;
-
+    public static final int NEWPAGE = 32;
     // Text processing
     private static final String TXT_NEWLINE = "@@NeWlInE@@";
 
@@ -255,7 +266,7 @@ public class HexPDF extends PDDocument {
      * Default margin in points between table cell border and table cell text.
      *
      * @see #settableCellMargin(float)
-     * @see #drawTable(java.lang.String[][], float[], int[], int)
+     * @see #drawTable(java.lang.Object[][], float[], int[], int)
      */
     public static final float DEFAULT_TABLE_CELL_MARGIN = 5;
 
@@ -273,10 +284,10 @@ public class HexPDF extends PDDocument {
         this.fontSize = 10;
         this.font = PDType1Font.HELVETICA;
         this.pageSize = PDPage.PAGE_SIZE_A4;
-        this.textColor = Color.black;
         this.normalColor = Color.black;
         this.titleColor = Color.BLUE;
-        firstPage();
+        this.orientation = HexPDF.PORTRAIT;
+        //firstPage();
     }
 
     /**
@@ -293,11 +304,9 @@ public class HexPDF extends PDDocument {
      * @see #cursorY
      */
     protected void setDimensions() {
-        pageWidth = pageSize.getWidth();
-        pageHeight = pageSize.getHeight();
 
         contentHeight = pageHeight - topMargin - bottomMargin;
-        contentWidth = pageWidth - leftMargin - rightMargin;
+        contentWidth  = pageWidth - leftMargin - rightMargin;
 
         contentStartX = leftMargin;
         contentEndX = leftMargin + contentWidth;
@@ -330,15 +339,7 @@ public class HexPDF extends PDDocument {
         }
     }
 
-    /**
-     * Save the pdf document to file.
-     *
-     * @param filename Full path for the resulting pdf file
-     * @throws IOException
-     * @throws org.apache.pdfbox.exceptions.COSVisitorException
-     */
-    @Override
-    public void save(String filename) throws IOException, COSVisitorException {
+    private void savedoc(String filename) throws IOException, COSVisitorException {
         closePage();
         super.save(filename);
     }
@@ -375,7 +376,7 @@ public class HexPDF extends PDDocument {
 
     private void drawFooters() {
         if (footer != null) {
-            ignorePagebleed = true;
+            ignorePagebleed = true; // Now new pages while writing footers!
 
             int pg;
             int pagecounter = 0;
@@ -393,17 +394,17 @@ public class HexPDF extends PDDocument {
 
                         if (footer.getLeftText() != null && !footer.getLeftText().isEmpty()) {
                             String left = replaceBookmarks(footer.getLeftText(), pg, total);
-                            setCursor(leftMargin, 25);
+                            setCursor(contentStartX, contentEndY - lineSep);
                             drawText(left, HexPDF.LEFT);
                         }
                         if (footer.getRightText() != null && !footer.getRightText().isEmpty()) {
                             String right = replaceBookmarks(footer.getRightText(), pg, total);
-                            setCursor(leftMargin, 25);
+                            setCursor(contentStartX, contentEndY - lineSep);
                             drawText(right, HexPDF.RIGHT);
                         }
                         if (footer.getCenterText() != null && !footer.getCenterText().isEmpty()) {
                             String right = replaceBookmarks(footer.getCenterText(), pg, total);
-                            setCursor(leftMargin, 25);
+                            setCursor(contentStartX, contentEndY - lineSep);
                             drawText(right, HexPDF.CENTER);
                         }
                     }
@@ -430,7 +431,23 @@ public class HexPDF extends PDDocument {
         }
 
         currentPage = new PDPage();
-        currentPage.setMediaBox(pageSize);
+        float x1 = this.pageSize.getLowerLeftX();
+        float y1 = this.pageSize.getLowerLeftY();
+        float x2 = this.pageSize.getUpperRightX();
+        float y2 = this.pageSize.getUpperRightY();
+        float w  = this.pageSize.getWidth();
+        float h  = this.pageSize.getHeight();
+        if (orientation == HexPDF.PORTRAIT){
+            pageWidth = w;
+            pageHeight = h;
+            currentPage.setMediaBox(new PDRectangle(new BoundingBox(x1, y1, x2, y2)));
+        }
+        else{
+            pageWidth = h;
+            pageHeight = w;
+            currentPage.setMediaBox(new PDRectangle(new BoundingBox(y1, x1, y2, x2)));
+        }
+        
         setDimensions();
         cursorX = contentStartX;
         cursorY = contentStartY;
@@ -445,25 +462,25 @@ public class HexPDF extends PDDocument {
     /**
      * Save and close the document.
      *
+     * @param filename  Path to saved document
      * @see #save(java.lang.String)
      * @see #close()
      */
     public void finish(String filename) {
         try {
+            setTextColor(footer.getTextColor());
+            setFont(footer.getFont());
+            setFontSize(footer.getFontsize());
+
             closePage();
             drawFooters();
-            save(filename);
+            savedoc(filename);
             close();
         } catch (IOException ex) {
             Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
         } catch (COSVisitorException ex) {
             Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
         }
-    }
-
-    // To avoid direct use of overridable method in constructor
-    private void firstPage() {
-        newPage();
     }
 
     /**
@@ -573,7 +590,92 @@ public class HexPDF extends PDDocument {
         }
         return ret;
     }
+    
+    // Estimate height of a table cell. Used by rowHeight to determine
+    // if page break should be inserted in a table
+    private float elemHeight(Object elem, float startx, float endx, int flags) {
+        String txt;
+        if (elem instanceof BufferedImage){
+            return ((BufferedImage)elem).getHeight();
+        }
+        txt = (String)elem;
+        
+        float cystart = cursorY;
+        float cxstart = cursorX;
+        
+        int align = HexPDF.LEFT;
+        if ((flags & HexPDF.CENTER) > 0) {
+            align = HexPDF.CENTER;
+        } else if ((flags & HexPDF.RIGHT) > 0) {
+            align = HexPDF.RIGHT;
+        } else if ((flags & HexPDF.JUSTIFY) > 0) {
+            align = HexPDF.JUSTIFY;
+        }
+        if (txt == null || txt.isEmpty()){
+            return 0;
+        }
+        txt = txt.replace("\n", " " + HexPDF.TXT_NEWLINE + " ");
+        String[] words = txt.split("\\s+");
+        int i = 0;
+        float height = 0;
+        while (i < words.length) {
+            int num = makeLine(words, i, endx - cursorX);
+            if (num == -1) { // newline
+                i++;
+                cursorX = startx;
+                cursorY -= lineSep;
+                height += lineSep;
+            } else if (num == 0) {
+                if (cursorX > startx) {
+                    // Something on line from start. Try a newline first, then recheck.
+                    cursorX = startx;
+                    cursorY -= lineSep;
+                } else {
+                    // a single word is too big for the box. Draw it!
+                    cursorY -= lineSep;
+                    cursorX = startx;
+                    i++;
+                }
+            } else {
+                String toDraw = join(words, i, num);
+                float strlen = textWidth(toDraw);
+                if ((cursorX == startx) && (align == HexPDF.RIGHT || align == HexPDF.CENTER || align == HexPDF.JUSTIFY)) {
+                    boolean newline_after = ((i + num) >= words.length || words[i + num].equals(HexPDF.TXT_NEWLINE));
+                    if (align == HexPDF.JUSTIFY) {
+                        if (newline_after == false) {
+                            cursorX = endx;
+                        }
+                        else{
+                            cursorX += strlen;
+                        }
+                    } else {
+                        cursorX += (align == HexPDF.RIGHT) ? endx : cursorX + strlen;
+                    }
+                }
+                else {
+                    cursorX += strlen;
+                }
 
+                i += num;
+            }
+        }
+        height = lineSep + cystart - cursorY;
+        setCursor(cxstart, cystart);
+        return height;
+    }
+
+    // Estimate heght of a table row. Used for determining page breaks within
+    // a table
+    private float rowHeight(float x, float y, float[] w, Object[] cells, int[] flags){
+        float maxh=0, thish, cellx = x;
+        for (int i = 0; i < cells.length; i++){
+            thish = (elemHeight(cells[i], cellx, w[i], flags[i]));
+            cellx += w[i];
+            maxh = (thish > maxh)?thish:maxh;
+        }
+        return maxh;
+    }
+            
     /**
      * Draw a text from the current cursor position. The text can be multi-line
      * and even multi-page. When crossing page boundaries
@@ -593,6 +695,7 @@ public class HexPDF extends PDDocument {
      * @see #drawText(java.lang.String, float, float, int)
      */
     protected float _drawText(String txt, float startx, float endx, int flags) {
+        float cystart = cursorY;
         int align = HexPDF.LEFT;
         if ((flags & HexPDF.CENTER) > 0) {
             align = HexPDF.CENTER;
@@ -615,17 +718,18 @@ public class HexPDF extends PDDocument {
                 cursorX = startx;
                 cursorY -= lineSep;
                 // New page?
-                if (ignorePagebleed == false && ((cursorY - lineSep) < bottomMargin)) {
+                if (ignorePagebleed == false && ((cursorY - lineSep) < contentEndY)) {
                     newPage();
                     cursorX = startx;
                 }
+                height += lineSep;
             } else if (num == 0) {
                 if (cursorX > startx) {
                     // Something on line from start. Try a newline first, then recheck.
                     cursorX = startx;
                     cursorY -= lineSep;
                     // New page?
-                    if (ignorePagebleed == false && ((cursorY - lineSep) < bottomMargin)) {
+                    if (ignorePagebleed == false && ((cursorY - lineSep) < contentEndY)) {
                         newPage();
                         cursorX = startx;
                     }
@@ -636,7 +740,7 @@ public class HexPDF extends PDDocument {
                     cursorX = startx;
                     i++;
                     // New page?
-                    if (ignorePagebleed == false && ((cursorY - lineSep) < bottomMargin)) {
+                    if (ignorePagebleed == false && ((cursorY - lineSep) < contentEndY)) {
                         newPage();
                         cursorX = startx;
                     }
@@ -666,12 +770,10 @@ public class HexPDF extends PDDocument {
                 if (toDraw != null) {
                     doDrawText(toDraw);
                 }
-
                 i += num;
-                height += lineSep;
             }
         }
-        return height;
+        return lineSep + cystart - cursorY;
     }
 
     /**
@@ -766,11 +868,11 @@ public class HexPDF extends PDDocument {
         float imgX = cursorX;
         float imgY = cursorY - imH;
         if ((flags & HexPDF.CENTER) > 0) {
-            imgX = (pageWidth - imW) / 2;
+            imgX = contentStartX+((contentWidth - imW) / 2);
         } else if ((flags & HexPDF.LEFT) > 0) {
-            imgX = leftMargin;
+            imgX = contentStartX;
         } else if ((flags & HexPDF.RIGHT) > 0) {
-            imgX = pageWidth - rightMargin - imW;
+            imgX = contentEndX - imW;
         }
 
         try {
@@ -780,7 +882,7 @@ public class HexPDF extends PDDocument {
         }
 
         if ((flags & HexPDF.NEWLINE) > 0) {
-            setCursor(leftMargin, imgY - lineSep);
+            setCursor(contentStartX, imgY - lineSep);
         }
     }
 
@@ -807,9 +909,25 @@ public class HexPDF extends PDDocument {
     }
 
     // TABLE functions
+    
+    // Add a text cell to table
     private float addCell(float x, float y, float w, String txt, int flags) {
         setCursor(x + tableCellMargin, y - 0.8f * lineSep);
         return _drawText(txt, x + tableCellMargin, x + w - tableCellMargin, flags);
+    }
+    // Add an image cell to table
+    private float addCell(float x, float y, float w, BufferedImage image, int flags) {
+        if ((flags & HexPDF.CENTER) > 0){
+            setCursor(x + 0.5f *(w - image.getWidth()), y);// - tableCellMargin);
+        }
+        else if((flags & HexPDF.RIGHT) > 0){
+            setCursor(x + w - image.getWidth(), y);// - tableCellMargin);
+        }
+        else{
+            setCursor(x + tableCellMargin, y);// - tableCellMargin);
+        }
+        drawImage(image, 0);
+        return (image.getHeight());// + 2 * tableCellMargin);
     }
 
     private void addCellBorder(float x, float y, float w, float h) {
@@ -823,16 +941,24 @@ public class HexPDF extends PDDocument {
         }
     }
 
-    private float addRow(float x, float y, float[] w, String[] cells, int[] flags) {
+    private float addRow(float x, float y, float[] w, Object[] cells, int[] flags) {
         float maxh = 0;
+        float thish = 0;
         float cellx = x;
-        for (int i = 0; i < w.length; i++) {
-            float thish = addCell(cellx, y, w[i], cells[i], flags[i]);
+        int i;
+        for (i = 0; i < w.length; i++) {
+            thish = 0;
+            if (cells[i] instanceof String){
+                thish = addCell(cellx, y, w[i], (String)cells[i], flags[i]);
+            }
+            else if (cells[i] instanceof BufferedImage){
+                thish = addCell(cellx, y, w[i], (BufferedImage)cells[i], flags[i]);
+            }
             cellx += w[i];
             maxh = (thish > maxh) ? thish : maxh;
         }
         cellx = x;
-        for (int i = 0; i < w.length; i++) {
+        for (i = 0; i < w.length; i++) {
             addCellBorder(cellx, y, w[i], maxh);
             cellx += w[i];
         }
@@ -841,7 +967,7 @@ public class HexPDF extends PDDocument {
 
     /**
      * Add a table to the document starting at current cursor location. The
-     * input table must be a two-dimensional array of <code>String</code>, all
+     * input table must be a two-dimensional array of <code>Object</code>, all
      * rows must have the same number of columns.
      *
      * If the table extends beyond the page boundary <code>contentEndY</code> a
@@ -849,8 +975,10 @@ public class HexPDF extends PDDocument {
      *
      * Normal word-wrap is performed within each cell if the text is longer than
      * the column´ designated width.
+     * 
+     * A table element (Object) can be either a String or a BufferedImage
      *
-     * @param table the table data
+     * @param table the table data. Objects should be String or BufferedImage
      * @param column_width array of column widths
      * @param column_flag array of flags for text alignment within columns, one
      * of <code>HexPDF.LEFT | HexPDF.CENTER | HexPDF.RIGHT</code>
@@ -858,11 +986,12 @@ public class HexPDF extends PDDocument {
      * @return the height of the table - if multipage then return the height on
      * the last page.
      */
-    public float drawTable(String[][] table, float[] column_width, int[] column_flag,
-            int table_align) {
+    public float drawTable(Object[][] table, float[] column_width, int[] column_flag, int table_align) {
         float tabheight = 0;
         float rowheight = 0;
         float table_width = 0;
+        boolean oldIgnoreBleed = ignorePagebleed;
+        ignorePagebleed = true; // No unintended page-breaks while adding table
         for (float colwidth : column_width) {
             table_width += colwidth;
         }
@@ -874,26 +1003,35 @@ public class HexPDF extends PDDocument {
         if (table_align == HexPDF.CENTER || table_align == HexPDF.RIGHT) {
             x += ((table_align == HexPDF.CENTER) ? free_space / 2 : free_space);
         }
-        for (String[] row : table) {
+        int rownum = 1;
+        for (Object[] row : table) {
             if (row != null) {
+                // Can the next row it fit on same page? Find the height of next
+                // row and make a new page after adding this row if necessary.
+                float guessRowHeight = 0;
+                if (rownum < table.length){
+                    guessRowHeight = rowHeight(x, contentStartY, column_width, table[rownum], column_flag);
+                }
                 rowheight = addRow(x, y - tabheight, column_width, row, column_flag);
                 tabheight += rowheight;
-                if ((y - tabheight - rowheight) < bottomMargin) {
-                    // New page
+                // Ne page before next row?
+                if ((y - tabheight - guessRowHeight) < contentEndY){
                     newPage();
                     tabheight = 0;
                     y = contentStartY;
                 }
             }
+            rownum++;
         }
-        cursorX = leftMargin;
+        cursorX = contentStartX;
         cursorY -= (rowheight + tableCellMargin);
+        ignorePagebleed = oldIgnoreBleed;
         return tabheight;
     }
 
     // Setters and getters
     /**
-     * Set current font to a title-1 style.
+     * Set current font-size and color to a title-1 style.
      *
      * @see #title1FontSize
      * @see #titleColor
@@ -904,7 +1042,7 @@ public class HexPDF extends PDDocument {
     }
 
     /**
-     * Set current font to a title-2 style.
+     * Set current font-size and color to a title-2 style.
      *
      * @see #title2FontSize
      * @see #titleColor
@@ -915,7 +1053,7 @@ public class HexPDF extends PDDocument {
     }
 
     /**
-     * Set current font to normal style.
+     * Set current font-size and color to normal style.
      *
      * @see #normalFontSize
      * @see #normalColor
@@ -936,15 +1074,19 @@ public class HexPDF extends PDDocument {
 
     /**
      * Set font size in points.
+     * Normally you should not use this directly.
+     * Instead, do setNormalFontSize() followed by normalStyle()
      *
      * @param fs font size in points
      */
     public void setFontSize(float fs) {
         this.fontSize = fs;
-        try {
-            cs.setFont(font, fontSize);
-        } catch (IOException ex) {
-            Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
+        if (currentPage != null){
+            try {
+                cs.setFont(font, fontSize);
+            } catch (IOException ex) {
+                Logger.getLogger(HexPDF.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
         lineSep = font.getFontDescriptor().getFontBoundingBox().getHeight() / 1000 * fontSize;
     }
@@ -1168,44 +1310,106 @@ public class HexPDF extends PDDocument {
         }
     }
 
+    /**
+     * Get the footer set for the document.
+     * @return Footer
+     */
     public Footer getFooter() {
         return footer;
     }
 
+    /**
+     * Set footer to use on all pages.
+     * The footer is added when finalizing the document.
+     * @param footer    Footer to use
+     * @see net.heksemann.hexpdf.Footer
+     */
     public void setFooter(Footer footer) {
         this.footer = footer;
     }
 
+    /**
+     * Get the color currently used for title style writing.
+     * @return  Color
+     */
     public Color getTitleColor() {
         return titleColor;
     }
 
+    /**
+     * Set the color to use for title style writing.
+     * @param titleColor    Color
+     */
     public void setTitleColor(Color titleColor) {
         this.titleColor = titleColor;
     }
 
+    /**
+     * Get the color currently used for normal style writing.
+     * @return color    Color
+     */
     public Color getNormalColor() {
         return normalColor;
     }
 
+    /**
+     * Set the color to use for normal style writing.
+     * @param color Color
+     */
     public void setNormalColor(Color color) {
         this.normalColor = color;
     }
 
+    /**
+     * Return the left boundary of the page content area.
+     * @return x-coordinate points
+     */
     public float getContentStartX() {
         return contentStartX;
     }
 
+    /**
+     * Return the upper boundary of the page content area.
+     * @return y-coordinate points
+     */
     public float getContentStartY() {
         return contentStartY;
     }
 
+    /**
+     * Return the right boundary of the page content area.
+     * @return x-coordinate points
+     */
     public float getContentEndX() {
         return contentEndX;
     }
 
+    /**
+     * Return the lower boundary of the page content area.
+     * @return y-coordinate points
+     */
     public float getContentEndY() {
         return contentEndY;
+    }
+
+    /**
+     * Set page orientation.
+     * Takes effect only next tine a newpage() is explicitly or implicitly called.
+     * @param orientation   HexPDF.LANDSCAPE | HexPDF.PORTRAIT
+     */
+    public void setOrientation(int orientation) {
+        this.orientation = orientation;
+    }
+
+    /**
+     * Set page size to be used.
+     * Takes effect on the next explicit or automatic newPage()
+     * Default is <code>PDPage.PAGE_SIZE_A4</code>
+     * @param pageSize  page dimension as <code>PDRectangle</code>
+     * @see PDRectangle
+     */
+    public void setPageSize(PDRectangle pageSize) {
+        this.pageSize = pageSize;
     }
 
 }

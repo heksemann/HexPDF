@@ -47,9 +47,12 @@ import net.heksemann.hexpdf.HexPDF;
 public class CreateHexPDFdoc {
 
     private void createDocument() {
-        BufferedImage basemap = getImage("http://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Dollnstein_-_Burgzugang.jpg/800px-Dollnstein_-_Burgzugang.jpg");
-        BufferedImage overlay = getImage("http://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/560px-PNG_transparency_demonstration_1.png");
-        String[][] table = getTable("table.txt");
+        String imgPath1 = "http://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Dollnstein_-_Burgzugang.jpg/800px-Dollnstein_-_Burgzugang.jpg";
+        String imgPath2 = "http://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/560px-PNG_transparency_demonstration_1.png";
+
+        BufferedImage basemap = getImage(imgPath1, 400, 300);
+        BufferedImage overlay = getImage(imgPath2, 400, 300);
+        Object[][] table = getTable();
 
         // Create a new document and include a default footer
         HexPDF doc = new HexPDF();
@@ -59,6 +62,9 @@ public class CreateHexPDFdoc {
         // Use footer also on first page
         doc.getFooter().setOMIT_FIRSTPAGE(false);
 
+        // Create the first page
+        doc.newPage();
+        
         // Add a main title, centered in shiny colours
         doc.title1Style();
         doc.setTextColor(new Color(0x2020ff));
@@ -87,8 +93,8 @@ public class CreateHexPDFdoc {
         // Add a table centered on page, crossing page boundary. 
         // Four columns, aligned left, center, right, left
         doc.drawTable(table,
-                new float[]{100, 60, 70, 200},
-                new int[]{HexPDF.LEFT, HexPDF.CENTER, HexPDF.RIGHT, HexPDF.LEFT},
+                new float[]{50, 100, 60, 70, 200},
+                new int[]{HexPDF.CENTER, HexPDF.LEFT, HexPDF.CENTER, HexPDF.RIGHT, HexPDF.LEFT},
                 HexPDF.CENTER);
         // Add a caption under the table
         doc.drawText("Table 1: A rather odd table, centered on page\n", HexPDF.CENTER);
@@ -121,10 +127,8 @@ public class CreateHexPDFdoc {
     }
 
     // Helper functions used to retrieve text, table and images
-    private BufferedImage getImage(String fn) {
+    private BufferedImage getImage(String fn, int w, int h) {
         BufferedImage image = null;
-        final int w = 400;
-        final int h = 300;
         try {
             URL url = new URL(fn);
             BufferedImage src = ImageIO.read(url);
@@ -154,17 +158,18 @@ public class CreateHexPDFdoc {
         return ret;
     }
 
-    private String[][] getTable(String fn) {
-        String[][] tab = {
-            {"Country", "Area", "Population", "Info"},
-            {"Norway", "col2", "col2", "col4"},
-            {"Sweden", "col2", "col2", "col4"},
-            {"Denmark", "col2", "col2", "col4"},
-            {"Vietnam", "col2", "col2", "col4"},
-            {"Thaland", "col2", "col2", "col4"},
-            {"Burma", "col2", "col2", "col4"},
-            {"USA", "col2", "col2", "col4"},
-            {"Germany", "col2", "col2", "col4"}
+    private Object[][] getTable() {
+        String base = "https://flagspot.net/images/";
+        Object[][] tab = {
+            {null,                                "Country", "Area", "Population", "Info"},
+            {getImage(base + "n/no.gif", 50, 40), "Norway",  "col2", "col2", "col4"},
+            {getImage(base + "s/se.gif", 50, 40), "Sweden",  "col2", "col2", "col4"},
+            {getImage(base + "d/dk.gif", 50, 40), "Denmark", "col2", "col2", "col4"},
+            {getImage(base + "v/vn.gif", 50, 40), "Vietnam", "col2", "col2", "col4"},
+            {getImage(base + "t/th.gif", 50, 40), "Thaland", "col2", "col2", "col4"},
+            {getImage(base + "m/mm.gif", 50, 40), "Burma",   "col2", "col2", "col4"},
+            {getImage(base + "u/us.gif", 50, 40), "USA", "col2", "col2", "col4"},
+            {getImage(base + "d/de.gif", 50, 40), "Germany", "col2", "col2", "col4"}
         };
 
         return tab;

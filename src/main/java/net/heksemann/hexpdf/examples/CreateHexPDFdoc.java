@@ -47,8 +47,8 @@ import net.heksemann.hexpdf.HexPDF;
 public class CreateHexPDFdoc {
 
     private void createDocument() {
-        String imgPath1 = "http://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Dollnstein_-_Burgzugang.jpg/800px-Dollnstein_-_Burgzugang.jpg";
-        String imgPath2 = "http://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/560px-PNG_transparency_demonstration_1.png";
+        String imgPath1 = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Dollnstein_-_Burgzugang.jpg/800px-Dollnstein_-_Burgzugang.jpg";
+        String imgPath2 = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/560px-PNG_transparency_demonstration_1.png";
 
         BufferedImage basemap = getImage(imgPath1, 400, 300);
         BufferedImage overlay = getImage(imgPath2, 400, 300);
@@ -171,7 +171,6 @@ public class CreateHexPDFdoc {
             {getImage(base + "u/us.gif", 50, 40), "USA", "col2", "col2", "col4"},
             {getImage(base + "d/de.gif", 50, 40), "Germany", "col2", "col2", "col4"}
         };
-
         return tab;
     }
 
